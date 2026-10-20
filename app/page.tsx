@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Camera, CheckCircle2, MapPin, Truck, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
