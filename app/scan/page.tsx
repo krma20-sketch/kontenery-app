@@ -88,7 +88,7 @@ export default function DriverScannerPage() {
           qrRef.current.stop().catch(() => {});
         }
       } catch (e) {
-        // ciche ignorowanie
+        // ignoruj przy odmontowaniu
       }
     };
   }, []);
@@ -102,26 +102,10 @@ export default function DriverScannerPage() {
         qrRef.current.clear();
       }
     } catch (e) {
-      console.warn('Błąd podczas zatrzymywania kamery:', e);
+      console.warn(e);
     } finally {
       setScannerActive(false);
     }
-  };
-
-  const goToDashboard = () => {
-    // 1. Zatrzymanie strumienia w tle bez czekania na promise
-    if (qrRef.current) {
-      try {
-        if (qrRef.current.isScanning) {
-          qrRef.current.stop().catch(() => {});
-        }
-        qrRef.current.clear();
-      } catch (e) {
-        // ignoruj
-      }
-    }
-    // 2. Natychmiastowe, twarde przekierowanie pod adres główny
-    window.location.assign('/');
   };
 
   const startScanner = async () => {
@@ -231,14 +215,10 @@ export default function DriverScannerPage() {
       <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
         <a
           href="/"
-          onClick={(e) => {
-            e.preventDefault();
-            goToDashboard();
-          }}
-          className="flex items-center gap-2 text-slate-300 hover:text-white transition px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 active:scale-95 cursor-pointer"
+          className="flex items-center gap-2 text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl text-sm font-bold border border-slate-700"
         >
           <ArrowLeft className="w-5 h-5 text-emerald-400" />
-          <span className="font-semibold text-sm">Pulpit</span>
+          <span>Pulpit</span>
         </a>
         <span className="text-sm font-semibold text-emerald-400">Terminal Kierowcy</span>
       </div>
@@ -297,8 +277,8 @@ export default function DriverScannerPage() {
                 type="text"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
-                placeholder="np. KT-001"
-                className="flex-1 px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+                placeholder="KT-001"
+                className="flex-1 px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono text-base uppercase"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     handleContainerIdentified(manualCode.toUpperCase().trim());
@@ -308,9 +288,9 @@ export default function DriverScannerPage() {
               <button
                 type="button"
                 onClick={() => handleContainerIdentified(manualCode.toUpperCase().trim())}
-                className="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition"
+                className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm tracking-wide transition shadow-lg shadow-emerald-950"
               >
-                Szukaj
+                SZUKAJ
               </button>
             </div>
           </div>
