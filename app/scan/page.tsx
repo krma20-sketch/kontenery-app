@@ -83,23 +83,45 @@ export default function DriverScannerPage() {
     initData();
 
     return () => {
-      if (qrRef.current && qrRef.current.isScanning) {
-        qrRef.current.stop().catch(() => {});
+      try {
+        if (qrRef.current && qrRef.current.isScanning) {
+          qrRef.current.stop().catch(() => {});
+        }
+      } catch (e) {
+        // ciche ignorowanie
       }
     };
   }, []);
 
   const stopScanner = async () => {
-    if (qrRef.current && qrRef.current.isScanning) {
-      await qrRef.current.stop();
-      qrRef.current.clear();
+    try {
+      if (qrRef.current) {
+        if (qrRef.current.isScanning) {
+          await qrRef.current.stop();
+        }
+        qrRef.current.clear();
+      }
+    } catch (e) {
+      console.warn('Błąd podczas zatrzymywania kamery:', e);
+    } finally {
       setScannerActive(false);
     }
   };
 
-  const goToDashboard = async () => {
-    await stopScanner();
-    window.location.href = '/';
+  const goToDashboard = () => {
+    // 1. Zatrzymanie strumienia w tle bez czekania na promise
+    if (qrRef.current) {
+      try {
+        if (qrRef.current.isScanning) {
+          qrRef.current.stop().catch(() => {});
+        }
+        qrRef.current.clear();
+      } catch (e) {
+        // ignoruj
+      }
+    }
+    // 2. Natychmiastowe, twarde przekierowanie pod adres główny
+    window.location.assign('/');
   };
 
   const startScanner = async () => {
@@ -207,13 +229,17 @@ export default function DriverScannerPage() {
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 max-w-lg mx-auto pb-12">
       <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
-        <button
-          onClick={goToDashboard}
-          type="button"
-          className="flex items-center gap-2 text-slate-400 hover:text-white transition px-2 py-1 rounded"
+        <a
+          href="/"
+          onClick={(e) => {
+            e.preventDefault();
+            goToDashboard();
+          }}
+          className="flex items-center gap-2 text-slate-300 hover:text-white transition px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 active:scale-95 cursor-pointer"
         >
-          <ArrowLeft className="w-5 h-5" /> Pulpit
-        </button>
+          <ArrowLeft className="w-5 h-5 text-emerald-400" />
+          <span className="font-semibold text-sm">Pulpit</span>
+        </a>
         <span className="text-sm font-semibold text-emerald-400">Terminal Kierowcy</span>
       </div>
 
