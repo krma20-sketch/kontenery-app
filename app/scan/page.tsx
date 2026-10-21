@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, CheckCircle2, MapPin, Truck, ArrowLeft } from 'lucide-react';
+import { Camera, CheckCircle2, MapPin, Truck, Warehouse, ArrowLeft } from 'lucide-react';
 
 interface Client {
   id: string;
@@ -88,7 +88,7 @@ export default function DriverScannerPage() {
           qrRef.current.stop().catch(() => {});
         }
       } catch (e) {
-        // ignoruj przy odmontowaniu
+        // ignoruj
       }
     };
   }, []);
@@ -150,7 +150,8 @@ export default function DriverScannerPage() {
     setLoading(false);
   };
 
-  const handleCheckIn = async () => {
+  // 1. Zostawienie u klienta
+  const handleCheckInClient = async () => {
     if (!container) return;
     setLoading(true);
 
@@ -175,13 +176,14 @@ export default function DriverScannerPage() {
       lng: coords?.lng || null,
     });
 
-    setMessage(`Zapisano! Kontener ${container.code} postawiony. Timer wystartował.`);
+    setMessage(`Zapisano! Kontener ${container.code} postawiony u klienta. Czas wystartował.`);
     setContainer(null);
     setManualCode('');
     setLoading(false);
   };
 
-  const handleCheckOut = async () => {
+  // 2. Zabranie kontenera (W transporcie)
+  const handleCheckOutTransit = async () => {
     if (!container) return;
     setLoading(true);
 
@@ -204,14 +206,44 @@ export default function DriverScannerPage() {
       lng: coords?.lng || null,
     });
 
-    setMessage(`Pobrano kontener ${container.code}! Timer zresetowany. Status: W transporcie.`);
+    setMessage(`Pobrano kontener ${container.code}! Status: W transporcie (na haku).`);
+    setContainer(null);
+    setManualCode('');
+    setLoading(false);
+  };
+
+  // 3. Zdanie na bazę
+  const handleCheckInYard = async () => {
+    if (!container) return;
+    setLoading(true);
+
+    await supabase
+      .from('containers')
+      .update({
+        status: 'in_yard',
+        current_client_id: null,
+        current_lat: coords?.lat || null,
+        current_lng: coords?.lng || null,
+        placed_at: null,
+      })
+      .eq('id', container.id);
+
+    await supabase.from('scan_logs').insert({
+      container_id: container.id,
+      action: 'return_to_yard',
+      client_id: null,
+      lat: coords?.lat || null,
+      lng: coords?.lng || null,
+    });
+
+    setMessage(`Kontener ${container.code} zdany na bazę! Gotowy do ponownego wywozu.`);
     setContainer(null);
     setManualCode('');
     setLoading(false);
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-4 max-w-lg mx-auto pb-12">
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 max-w-lg mx-auto pb-12">
       <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
         <a
           href="/"
@@ -231,7 +263,7 @@ export default function DriverScannerPage() {
           </span>
         </div>
         {matchedClient && (
-          <span className="text-emerald-400 font-medium">Blisko: {matchedClient.name}</span>
+          <span className="text-emerald-400 font-medium">Wykryto klienta: {matchedClient.name}</span>
         )}
       </div>
 
@@ -302,19 +334,19 @@ export default function DriverScannerPage() {
               <span className="text-xs text-slate-400 uppercase font-mono">{container.container_type}</span>
               <h2 className="text-2xl font-black font-mono text-emerald-400">{container.code}</h2>
             </div>
-            <span className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">
-              Stan: {container.status}
+            <span className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 font-mono">
+              Status: {container.status === 'at_client' ? 'U klienta' : container.status === 'in_transit' ? 'W drodze' : 'Na bazie'}
             </span>
           </div>
 
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-1.5">
-              Przypisz lokalizację / klienta:
+              Firma / Lokalizacja (gdy zostawiasz u klienta):
             </label>
             <select
               value={selectedClientId}
               onChange={(e) => setSelectedClientId(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:border-emerald-500"
+              className="w-full px-3 py-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:border-emerald-500 text-sm"
             >
               <option value="">-- Wybierz klienta z listy --</option>
               {clients.map((c) => (
@@ -327,21 +359,30 @@ export default function DriverScannerPage() {
 
           <div className="grid grid-cols-1 gap-3 pt-2">
             <button
-              onClick={handleCheckIn}
+              onClick={handleCheckInClient}
               disabled={loading}
               type="button"
-              className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-white flex items-center justify-center gap-2 shadow-lg shadow-emerald-950"
+              className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-white flex items-center justify-center gap-2 shadow-lg shadow-emerald-950 active:scale-98 transition"
             >
               <CheckCircle2 className="w-5 h-5" /> Zostawiam u klienta (Start)
             </button>
 
             <button
-              onClick={handleCheckOut}
+              onClick={handleCheckOutTransit}
               disabled={loading}
               type="button"
-              className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white flex items-center justify-center gap-2 shadow-lg shadow-blue-950"
+              className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white flex items-center justify-center gap-2 shadow-lg shadow-blue-950 active:scale-98 transition"
             >
-              <Truck className="w-5 h-5" /> Zabieram kontener (Reset)
+              <Truck className="w-5 h-5" /> Zabieram / W transporcie
+            </button>
+
+            <button
+              onClick={handleCheckInYard}
+              disabled={loading}
+              type="button"
+              className="w-full py-4 rounded-xl bg-slate-700 hover:bg-slate-600 font-bold text-white flex items-center justify-center gap-2 shadow-lg active:scale-98 transition border border-slate-600"
+            >
+              <Warehouse className="w-5 h-5 text-amber-400" /> Zdaję na bazę (Koniec)
             </button>
 
             <button
@@ -350,13 +391,13 @@ export default function DriverScannerPage() {
                 setManualCode('');
               }}
               type="button"
-              className="w-full py-2.5 rounded-lg bg-transparent hover:bg-slate-800 text-slate-400 text-sm font-medium"
+              className="w-full py-2.5 rounded-lg bg-transparent hover:bg-slate-800 text-slate-400 text-sm font-medium mt-1"
             >
               Anuluj
             </button>
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
