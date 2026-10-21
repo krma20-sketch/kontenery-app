@@ -1,10 +1,11 @@
 'use client';
+
 export const dynamic = 'force-dynamic';
+
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Camera, CheckCircle2, MapPin, Truck, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
 
 interface Client {
   id: string;
@@ -45,6 +46,7 @@ export default function DriverScannerPage() {
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [scannerActive, setScannerActive] = useState(false);
+  const [manualCode, setManualCode] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -79,7 +81,26 @@ export default function DriverScannerPage() {
       }
     }
     initData();
+
+    return () => {
+      if (qrRef.current && qrRef.current.isScanning) {
+        qrRef.current.stop().catch(() => {});
+      }
+    };
   }, []);
+
+  const stopScanner = async () => {
+    if (qrRef.current && qrRef.current.isScanning) {
+      await qrRef.current.stop();
+      qrRef.current.clear();
+      setScannerActive(false);
+    }
+  };
+
+  const goToDashboard = async () => {
+    await stopScanner();
+    window.location.href = '/';
+  };
 
   const startScanner = async () => {
     setMessage(null);
@@ -104,15 +125,8 @@ export default function DriverScannerPage() {
     }
   };
 
-  const stopScanner = async () => {
-    if (qrRef.current && qrRef.current.isScanning) {
-      await qrRef.current.stop();
-      qrRef.current.clear();
-      setScannerActive(false);
-    }
-  };
-
   const handleContainerIdentified = async (code: string) => {
+    if (!code) return;
     setLoading(true);
     const { data, error } = await supabase
       .from('containers')
@@ -157,6 +171,7 @@ export default function DriverScannerPage() {
 
     setMessage(`Zapisano! Kontener ${container.code} postawiony. Timer wystartował.`);
     setContainer(null);
+    setManualCode('');
     setLoading(false);
   };
 
@@ -185,15 +200,20 @@ export default function DriverScannerPage() {
 
     setMessage(`Pobrano kontener ${container.code}! Timer zresetowany. Status: W transporcie.`);
     setContainer(null);
+    setManualCode('');
     setLoading(false);
   };
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 max-w-lg mx-auto pb-12">
       <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
-        <Link href="/" className="flex items-center gap-2 text-slate-400 hover:text-white">
+        <button
+          onClick={goToDashboard}
+          type="button"
+          className="flex items-center gap-2 text-slate-400 hover:text-white transition px-2 py-1 rounded"
+        >
           <ArrowLeft className="w-5 h-5" /> Pulpit
-        </Link>
+        </button>
         <span className="text-sm font-semibold text-emerald-400">Terminal Kierowcy</span>
       </div>
 
@@ -227,6 +247,7 @@ export default function DriverScannerPage() {
           {!scannerActive ? (
             <button
               onClick={startScanner}
+              type="button"
               className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-lg text-white flex items-center justify-center gap-3 shadow-lg shadow-emerald-950"
             >
               <Camera className="w-6 h-6" /> Włącz Skaner QR
@@ -234,6 +255,7 @@ export default function DriverScannerPage() {
           ) : (
             <button
               onClick={stopScanner}
+              type="button"
               className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-medium text-slate-200"
             >
               Wyłącz aparat
@@ -241,19 +263,30 @@ export default function DriverScannerPage() {
           )}
 
           <div className="pt-4 border-t border-slate-800">
-            <label className="block text-xs font-medium text-slate-400 mb-1">
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">
               Wpisz kod kontenera ręcznie:
             </label>
-            <input
-              type="text"
-              placeholder="np. KT-001 i wciśnij Enter"
-              className="w-full px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleContainerIdentified((e.target as HTMLInputElement).value.toUpperCase().trim());
-                }
-              }}
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={manualCode}
+                onChange={(e) => setManualCode(e.target.value)}
+                placeholder="np. KT-001"
+                className="flex-1 px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleContainerIdentified(manualCode.toUpperCase().trim());
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => handleContainerIdentified(manualCode.toUpperCase().trim())}
+                className="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition"
+              >
+                Szukaj
+              </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -290,6 +323,7 @@ export default function DriverScannerPage() {
             <button
               onClick={handleCheckIn}
               disabled={loading}
+              type="button"
               className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-white flex items-center justify-center gap-2 shadow-lg shadow-emerald-950"
             >
               <CheckCircle2 className="w-5 h-5" /> Zostawiam u klienta (Start)
@@ -298,13 +332,18 @@ export default function DriverScannerPage() {
             <button
               onClick={handleCheckOut}
               disabled={loading}
+              type="button"
               className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white flex items-center justify-center gap-2 shadow-lg shadow-blue-950"
             >
               <Truck className="w-5 h-5" /> Zabieram kontener (Reset)
             </button>
 
             <button
-              onClick={() => setContainer(null)}
+              onClick={() => {
+                setContainer(null);
+                setManualCode('');
+              }}
+              type="button"
               className="w-full py-2.5 rounded-lg bg-transparent hover:bg-slate-800 text-slate-400 text-sm font-medium"
             >
               Anuluj
