@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { QrCode, Clock, MapPin, AlertTriangle, RefreshCw, Layers } from 'lucide-react';
+import { QrCode, Clock, MapPin, AlertTriangle, RefreshCw, Layers, Printer, Filter } from 'lucide-react';
 
 interface Container {
   id: string;
@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const [containers, setContainers] = useState<Container[]>([]);
   const [loading, setLoading] = useState(true);
   const [showMap, setShowMap] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   const mapRef = useRef<any>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -53,7 +54,7 @@ export default function DashboardPage() {
     return Math.floor(diff / (1000 * 60 * 60 * 24));
   }
 
-  // Inicjalizacja Leaflet z CDN
+  // Załadowanie Leaflet z CDN
   useEffect(() => {
     if (!showMap) return;
 
@@ -78,14 +79,12 @@ export default function DashboardPage() {
     };
   }, [showMap]);
 
-  // Rysowanie i aktualizacja markerów
   const initMap = () => {
     const L = (window as any).L;
     if (!L || !mapRef.current) return;
 
     if (!mapInstanceRef.current) {
-      // Domyślne wycentrowanie (np. Szczecin / zachodniopomorskie)
-      const map = L.map(mapRef.current).setView([53.4285, 14.5528], 11);
+      const map = L.map(mapRef.current).setView([53.4285, 14.5528], 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors',
         maxZoom: 19,
@@ -97,55 +96,99 @@ export default function DashboardPage() {
     renderMarkers();
   };
 
+  const filteredContainers = statusFilter
+    ? containers.filter((c) => c.status === statusFilter)
+    : containers;
+
   const renderMarkers = () => {
     const L = (window as any).L;
     if (!L || !mapInstanceRef.current) return;
 
-    // Usunięcie starych markerów
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
+    // Grupowanie kontenerów o tych samych współrzędnych GPS
+    const groupedByCoords: { [key: string]: Container[] } = {};
+
+    filteredContainers.forEach((c) => {
+      if (c.current_lat && c.current_lng) {
+        // Zaokrąglamy lekko klucz pozycji, aby złapać kontenery z tego samego placu/parkingu
+        const key = `${c.current_lat.toFixed(4)},${c.current_lng.toFixed(4)}`;
+        if (!groupedByCoords[key]) {
+          groupedByCoords[key] = [];
+        }
+        groupedByCoords[key].push(c);
+      }
+    });
+
     const bounds: any[] = [];
 
-    containers.forEach((c) => {
-      if (c.current_lat && c.current_lng) {
+    Object.entries(groupedByCoords).forEach(([key, items]) => {
+      const lat = items[0].current_lat!;
+      const lng = items[0].current_lng!;
+
+      // Wyznaczamy kolor na podstawie statusu dominującego lub ostrzegawczego
+      let badgeColor = '#10b981'; // Domyślnie baza (zielony)
+      if (items.some((c) => c.status === 'at_client')) {
+        const maxDays = Math.max(...items.filter(c => c.status === 'at_client').map(c => getDaysAtClient(c.placed_at)));
+        badgeColor = maxDays >= 14 ? '#ef4444' : maxDays >= 7 ? '#f59e0b' : '#3b82f6';
+      } else if (items.some((c) => c.status === 'in_transit')) {
+        badgeColor = '#6366f1'; // W transporcie
+      }
+
+      const countBadge = items.length > 1
+        ? `<span style="position: absolute; top: -6px; right: -6px; background: #0f172a; color: white; font-size: 10px; font-weight: bold; border-radius: 999px; width: 16px; height: 16px; display: flex; items-center; justify-content: center; border: 1.5px solid white;">${items.length}</span>`
+        : '';
+
+      const customIcon = L.divIcon({
+        className: 'custom-pin',
+        html: `
+          <div style="position: relative; width: 22px; height: 22px;">
+            <div style="background-color: ${badgeColor}; width: 22px; height: 22px; border-radius: 50%; border: 3px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.5);"></div>
+            ${countBadge}
+          </div>
+        `,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
+
+      // Złożony dymek dla jednego lub wielu kontenerów w tej lokalizacji
+      const itemsListHtml = items.map((c) => {
         const days = getDaysAtClient(c.placed_at);
-        let badgeColor = '#10b981'; // na bazie (zielony)
-        let statusLabel = 'Na bazie';
+        const statusLabel =
+          c.status === 'at_client'
+            ? `U klienta (${days} dni)`
+            : c.status === 'in_transit'
+            ? 'W transporcie'
+            : 'Na bazie';
 
-        if (c.status === 'at_client') {
-          badgeColor = days >= 14 ? '#ef4444' : days >= 7 ? '#f59e0b' : '#3b82f6';
-          statusLabel = `U klienta (${days} dni)`;
-        } else if (c.status === 'in_transit') {
-          badgeColor = '#6366f1';
-          statusLabel = 'W transporcie';
-        }
-
-        const customIcon = L.divIcon({
-          className: 'custom-pin',
-          html: `<div style="background-color: ${badgeColor}; width: 22px; height: 22px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.5);"></div>`,
-          iconSize: [22, 22],
-          iconAnchor: [11, 11],
-        });
-
-        const popupHtml = `
-          <div style="color: #0f172a; font-family: sans-serif; min-width: 150px;">
-            <div style="font-weight: bold; font-size: 14px; font-family: monospace;">${c.code}</div>
-            <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">${c.container_type}</div>
-            <hr style="margin: 6px 0; border: none; border-top: 1px solid #e2e8f0;" />
-            <div style="font-size: 12px; margin-bottom: 2px;"><b>Status:</b> ${statusLabel}</div>
-            ${c.clients?.name ? `<div style="font-size: 12px; margin-bottom: 2px;"><b>Klient:</b> ${c.clients.name}</div>` : ''}
-            ${c.status === 'at_client' ? `<div style="font-size: 12px; color: #b45309;"><b>Postój:</b> ${days} dni</div>` : ''}
+        return `
+          <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <span style="font-weight: bold; font-size: 13px; font-family: monospace;">${c.code}</span>
+              <span style="font-size: 10px; color: #64748b; text-transform: uppercase;">${c.container_type}</span>
+            </div>
+            <div style="font-size: 11px; margin-top: 2px;"><b>Status:</b> ${statusLabel}</div>
+            ${c.clients?.name ? `<div style="font-size: 11px; color: #047857;"><b>Klient:</b> ${c.clients.name}</div>` : ''}
           </div>
         `;
+      }).join('');
 
-        const marker = L.marker([c.current_lat, c.current_lng], { icon: customIcon })
-          .addTo(mapInstanceRef.current)
-          .bindPopup(popupHtml);
+      const popupHtml = `
+        <div style="color: #0f172a; font-family: sans-serif; min-width: 170px; max-height: 220px; overflow-y: auto;">
+          <div style="font-size: 10px; font-weight: bold; color: #64748b; text-transform: uppercase; margin-bottom: 6px;">
+            Kontenery w tej lokalizacji (${items.length}):
+          </div>
+          ${itemsListHtml}
+        </div>
+      `;
 
-        markersRef.current.push(marker);
-        bounds.push([c.current_lat, c.current_lng]);
-      }
+      const marker = L.marker([lat, lng], { icon: customIcon })
+        .addTo(mapInstanceRef.current)
+        .bindPopup(popupHtml);
+
+      markersRef.current.push(marker);
+      bounds.push([lat, lng]);
     });
 
     if (bounds.length > 0) {
@@ -157,7 +200,7 @@ export default function DashboardPage() {
     if (mapInstanceRef.current && (window as any).L) {
       renderMarkers();
     }
-  }, [containers]);
+  }, [filteredContainers]);
 
   const atClientCount = containers.filter((c) => c.status === 'at_client').length;
   const inTransitCount = containers.filter((c) => c.status === 'in_transit').length;
@@ -171,6 +214,14 @@ export default function DashboardPage() {
           <p className="text-xs text-slate-400">Podgląd floty kontenerów i lokalizacji GPS</p>
         </div>
         <div className="flex items-center gap-2">
+          <a
+            href="/print"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition"
+            title="Drukuj kody QR"
+          >
+            <Printer className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline">Drukuj QR</span>
+          </a>
           <button
             onClick={() => setShowMap(!showMap)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition"
@@ -200,20 +251,62 @@ export default function DashboardPage() {
         </a>
       </div>
 
+      {/* Kafelki z filtrami */}
       <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-center">
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'at_client' ? null : 'at_client')}
+          className={`p-3 rounded-xl text-center border transition ${
+            statusFilter === 'at_client'
+              ? 'bg-amber-950/40 border-amber-500 ring-2 ring-amber-500/50'
+              : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+          }`}
+        >
           <span className="text-xs text-slate-400 block mb-1">U klientów</span>
           <span className="text-2xl font-black text-amber-400">{atClientCount}</span>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-center">
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'in_transit' ? null : 'in_transit')}
+          className={`p-3 rounded-xl text-center border transition ${
+            statusFilter === 'in_transit'
+              ? 'bg-indigo-950/40 border-indigo-500 ring-2 ring-indigo-500/50'
+              : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+          }`}
+        >
           <span className="text-xs text-slate-400 block mb-1">W drodze</span>
           <span className="text-2xl font-black text-indigo-400">{inTransitCount}</span>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-center">
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'in_yard' ? null : 'in_yard')}
+          className={`p-3 rounded-xl text-center border transition ${
+            statusFilter === 'in_yard'
+              ? 'bg-emerald-950/40 border-emerald-500 ring-2 ring-emerald-500/50'
+              : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+          }`}
+        >
           <span className="text-xs text-slate-400 block mb-1">Na bazie</span>
           <span className="text-2xl font-black text-emerald-400">{inYardCount}</span>
-        </div>
+        </button>
       </div>
+
+      {statusFilter && (
+        <div className="mb-4 flex items-center justify-between bg-slate-900/80 border border-slate-800 px-4 py-2 rounded-xl text-xs">
+          <span className="text-slate-300 flex items-center gap-2">
+            <Filter className="w-3.5 h-3.5 text-emerald-400" />
+            Filtrowanie: <b className="text-white uppercase">{statusFilter}</b>
+          </span>
+          <button
+            onClick={() => setStatusFilter(null)}
+            className="text-emerald-400 hover:underline font-semibold"
+          >
+            Pokaż wszystkie
+          </button>
+        </div>
+      )}
 
       {showMap && (
         <div className="mb-6 rounded-2xl overflow-hidden border border-slate-800 bg-slate-900 p-2">
@@ -233,17 +326,17 @@ export default function DashboardPage() {
 
       <div className="space-y-3">
         <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-          Wszystkie kontenery ({containers.length})
+          Lista kontenerów ({filteredContainers.length})
         </h2>
 
-        {loading && containers.length === 0 ? (
+        {loading && filteredContainers.length === 0 ? (
           <div className="p-8 text-center text-slate-500 text-sm">Wczytywanie listy...</div>
-        ) : containers.length === 0 ? (
+        ) : filteredContainers.length === 0 ? (
           <div className="p-8 text-center text-slate-500 text-sm border border-dashed border-slate-800 rounded-2xl">
-            Brak kontenerów w bazie danych.
+            Brak kontenerów dla wybranego filtra.
           </div>
         ) : (
-          containers.map((c) => {
+          filteredContainers.map((c) => {
             const days = getDaysAtClient(c.placed_at);
             const isCritical = days >= 14;
             const isWarning = days >= 7;
