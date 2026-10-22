@@ -54,7 +54,6 @@ export default function DashboardPage() {
     return Math.floor(diff / (1000 * 60 * 60 * 24));
   }
 
-  // Załadowanie Leaflet z CDN
   useEffect(() => {
     if (!showMap) return;
 
@@ -107,12 +106,10 @@ export default function DashboardPage() {
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
-    // Grupowanie kontenerów o tych samych współrzędnych GPS
     const groupedByCoords: { [key: string]: Container[] } = {};
 
     filteredContainers.forEach((c) => {
       if (c.current_lat && c.current_lng) {
-        // Zaokrąglamy lekko klucz pozycji, aby złapać kontenery z tego samego placu/parkingu
         const key = `${c.current_lat.toFixed(4)},${c.current_lng.toFixed(4)}`;
         if (!groupedByCoords[key]) {
           groupedByCoords[key] = [];
@@ -127,13 +124,12 @@ export default function DashboardPage() {
       const lat = items[0].current_lat!;
       const lng = items[0].current_lng!;
 
-      // Wyznaczamy kolor na podstawie statusu dominującego lub ostrzegawczego
-      let badgeColor = '#10b981'; // Domyślnie baza (zielony)
+      let badgeColor = '#10b981';
       if (items.some((c) => c.status === 'at_client')) {
         const maxDays = Math.max(...items.filter(c => c.status === 'at_client').map(c => getDaysAtClient(c.placed_at)));
         badgeColor = maxDays >= 14 ? '#ef4444' : maxDays >= 7 ? '#f59e0b' : '#3b82f6';
       } else if (items.some((c) => c.status === 'in_transit')) {
-        badgeColor = '#6366f1'; // W transporcie
+        badgeColor = '#6366f1';
       }
 
       const countBadge = items.length > 1
@@ -152,7 +148,6 @@ export default function DashboardPage() {
         iconAnchor: [11, 11],
       });
 
-      // Złożony dymek dla jednego lub wielu kontenerów w tej lokalizacji
       const itemsListHtml = items.map((c) => {
         const days = getDaysAtClient(c.placed_at);
         const statusLabel =
@@ -208,11 +203,29 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 max-w-4xl mx-auto pb-16">
+      {/* NAGŁÓWEK Z WBUDOWANYM LOGO */}
       <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
-        <div>
-          <h1 className="text-xl font-black text-emerald-400 tracking-wide">PULPIT DYSPOZYTORA</h1>
-          <p className="text-xs text-slate-400">Podgląd floty kontenerów i lokalizacji GPS</p>
+        <div className="flex items-center gap-3">
+          <div className="bg-white px-2.5 py-1.5 rounded-xl flex items-center gap-2 border border-slate-200 shadow-sm">
+            <div className="flex flex-col leading-none">
+              <span className="text-slate-950 font-black text-xl tracking-tighter">TOM</span>
+              <span className="text-[7px] text-slate-600 font-bold uppercase tracking-tight">Elektrorecykling</span>
+            </div>
+            <div className="w-6 h-6 border-2 border-slate-900 rounded-sm flex items-center justify-center p-0.5">
+              <svg viewBox="0 0 24 24" className="w-full h-full text-red-600" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                <path d="M16 21h5v-5" />
+              </svg>
+            </div>
+          </div>
+          <div>
+            <h1 className="text-lg font-black text-emerald-400 tracking-wide leading-tight">PULPIT DYSPOZYTORA</h1>
+            <p className="text-[11px] text-slate-400">System zarządzania kontenerami</p>
+          </div>
         </div>
+
         <div className="flex items-center gap-2">
           <a
             href="/print"
@@ -251,7 +264,6 @@ export default function DashboardPage() {
         </a>
       </div>
 
-      {/* Kafelki z filtrami */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         <button
           type="button"
