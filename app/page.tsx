@@ -203,22 +203,26 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 max-w-4xl mx-auto pb-16">
-      {/* NAGŁÓWEK Z WBUDOWANYM LOGO */}
+      {/* NAGŁÓWEK Z ORYGINALNYM LOGO GRUPY TOM */}
       <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
         <div className="flex items-center gap-3">
-          <div className="bg-white px-2.5 py-1.5 rounded-xl flex items-center gap-2 border border-slate-200 shadow-sm">
-            <div className="flex flex-col leading-none">
-              <span className="text-slate-950 font-black text-xl tracking-tighter">TOM</span>
-              <span className="text-[7px] text-slate-600 font-bold uppercase tracking-tight">Elektrorecykling</span>
-            </div>
-            <div className="w-6 h-6 border-2 border-slate-900 rounded-sm flex items-center justify-center p-0.5">
-              <svg viewBox="0 0 24 24" className="w-full h-full text-red-600" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                <path d="M3 3v5h5" />
-                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-                <path d="M16 21h5v-5" />
-              </svg>
-            </div>
+          <div className="bg-white px-3 py-1.5 rounded-xl flex items-center shadow-md" style={{ height: '44px' }}>
+            <svg viewBox="0 0 450 145" className="h-full w-auto object-contain" fill="none">
+              {/* TOM */}
+              <path d="M12.4 12h81.2v14.4H53.1V112H38.7V26.4H12.4V12z" fill="#1C1C1B"/>
+              <path d="M141 11H99.2v102.1H141c29 0 48.6-19.1 48.6-51.1S170 11 141 11zm-.6 88h-26V25.1h26c19.3 0 34.3 11.2 34.3 36.9s-15 37-34.3 37z" fill="#1C1C1B" style={{ display: 'none' }} /> {/* (usunięto nadmiarową literę, by było TOM) */}
+              <path d="M144.5 11c-32.3 0-54.8 23-54.8 51.5s22.5 51.4 54.8 51.4 54.7-22.9 54.7-51.4-22.4-51.5-54.7-51.5zm0 88.5c-23.4 0-40-16.1-40-37s16.6-37 40-37 40 16.1 40 37-16.6 37-40 37z" fill="#1C1C1B"/>
+              <path d="M211.3 12h17l23.5 61.6L275.1 12h17v100h-13.8V42.8L257.6 98H245L225.1 42v70h-13.8V12z" fill="#1C1C1B"/>
+              
+              {/* ELEKTRORECYKLING SP. Z O.O. */}
+              <text x="12" y="132" fill="#4B5563" fontSize="19.5" fontWeight="bold" fontFamily="system-ui, sans-serif" letterSpacing="0.4">ELEKTRORECYKLING SP. Z O.O.</text>
+              
+              {/* SYMBOL RECYKLINGU W KWADRACIE */}
+              <rect x="314" y="10" width="124" height="124" rx="3" stroke="#1C1C1B" strokeWidth="3" fill="none" />
+              {/* Czerwona strzałka kołowa */}
+              <path d="M376 34c-19.9 0-36 16.1-36 36s16.1 36 36 36 36-16.1 36-36c0-6.1-1.5-11.8-4.2-16.8" stroke="#D11222" strokeWidth="12" strokeLinecap="round" />
+              <path d="M400 37l12 17-19.5 7.5 7.5-24.5z" fill="#D11222" />
+            </svg>
           </div>
           <div>
             <h1 className="text-lg font-black text-emerald-400 tracking-wide leading-tight">PULPIT DYSPOZYTORA</h1>
